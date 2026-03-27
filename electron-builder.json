@@ -1,0 +1,24 @@
+{
+  "appId": "com.interviewai.app",
+  "productName": "Interview AI",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "mac": {
+    "category": "public.app-category.productivity",
+    "target": ["dmg"],
+    "icon": "assets/icon.png"
+  },
+  "win": {
+    "target": ["nsis"],
+    "icon": "assets/icon.png"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "icon": "assets/icon.png"
+  }
+}
