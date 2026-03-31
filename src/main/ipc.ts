@@ -5,39 +5,53 @@ import path from 'path'
 import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import { IPC_CHANNELS, AppSettings, ContextDocument, DocumentChunk, TranscriptLine } from '../shared/types'
-import { SYSTEM_PROMPT_INTERVIEW, SYSTEM_PROMPT_MEETING, SYSTEM_PROMPT_SALES } from '../shared/prompts'
+import { SYSTEM_PROMPT_INTERVIEW, SYSTEM_PROMPT_MEETING, SYSTEM_PROMPT_SALES, SYSTEM_PROMPT_CUSTOM } from '../shared/prompts'
 import { transcribeAudioChunk, checkWhisperInstalled, startWhisperServer, stopWhisperServer } from './audio'
 
 const store = new Store()
 let contextDocuments: ContextDocument[] = []
 
-function chunkText(text: string, maxTokens: number = 500): string[] {
-  const words = text.split(/\s+/)
+// Sentence-aware chunking with overlap
+function chunkText(text: string, maxWords: number = 500, overlapWords: number = 50): string[] {
+  // Split into sentences
+  const sentences = text.split(/(?<=[.!?])\s+|\n+/).filter(s => s.trim().length > 0)
   const chunks: string[] = []
-  let current: string[] = []
-  let count = 0
+  let currentChunk: string[] = []
+  let currentWordCount = 0
 
-  for (const word of words) {
-    current.push(word)
-    count++
-    if (count >= maxTokens) {
-      chunks.push(current.join(' '))
-      current = []
-      count = 0
+  for (const sentence of sentences) {
+    const sentenceWords = sentence.split(/\s+/).length
+    if (currentWordCount + sentenceWords > maxWords && currentChunk.length > 0) {
+      chunks.push(currentChunk.join(' '))
+      // Keep last ~overlapWords for context continuity
+      const overlapText = currentChunk.join(' ').split(/\s+/).slice(-overlapWords).join(' ')
+      currentChunk = [overlapText]
+      currentWordCount = overlapWords
     }
+    currentChunk.push(sentence)
+    currentWordCount += sentenceWords
   }
-  if (current.length > 0) {
-    chunks.push(current.join(' '))
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join(' '))
   }
   return chunks
 }
 
 function extractKeywords(text: string): string[] {
   const stopWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'about', 'that', 'this', 'it', 'and', 'or', 'but', 'not', 'so', 'if', 'then', 'than', 'when', 'what', 'which', 'who', 'how', 'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your'])
-  return text.toLowerCase()
+  const words = text.toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 2 && !stopWords.has(w))
+
+  // Add bigrams for better matching
+  const bigrams: string[] = []
+  for (let i = 0; i < words.length - 1; i++) {
+    bigrams.push(`${words[i]} ${words[i + 1]}`)
+  }
+
+  return [...new Set([...words, ...bigrams])]
 }
 
 function findRelevantChunks(question: string, maxChunks: number = 3): string[] {
@@ -61,6 +75,7 @@ function getSystemPrompt(mode: string): string {
   switch (mode) {
     case 'meeting': return SYSTEM_PROMPT_MEETING
     case 'sales': return SYSTEM_PROMPT_SALES
+    case 'custom': return SYSTEM_PROMPT_CUSTOM
     default: return SYSTEM_PROMPT_INTERVIEW
   }
 }
@@ -87,7 +102,8 @@ async function streamOpenRouterResponse(
   })
 
   if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
+    const body = await response.text().catch(() => '')
+    throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}${body ? ` - ${body.slice(0, 200)}` : ''}`)
   }
 
   const reader = response.body?.getReader()
@@ -122,23 +138,21 @@ async function streamOpenRouterResponse(
 }
 
 export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
-  // Check if whisper is installed
+  // Whisper
   ipcMain.handle('whisper:check', async () => {
     return await checkWhisperInstalled()
   })
 
-  // Start whisper server (called when user clicks Start)
   ipcMain.handle('whisper:start', async () => {
     return await startWhisperServer()
   })
 
-  // Stop whisper server
   ipcMain.handle('whisper:stop', async () => {
     stopWhisperServer()
     return true
   })
 
-  // Audio transcription (local Whisper via persistent server)
+  // Audio transcription
   ipcMain.handle(IPC_CHANNELS.AUDIO_CHUNK, async (_event, audioData: ArrayBuffer) => {
     const buffer = Buffer.from(audioData)
     const result = await transcribeAudioChunk(buffer)
@@ -157,7 +171,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
 
     if (!apiKey) {
       overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_START)
-      overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_CHUNK, 'Error: No OpenRouter API key set. Go to Settings to add your key.')
+      overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_CHUNK, '**Error:** No OpenRouter API key set. Go to Settings (gear icon) to add your key.')
       overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_END)
       return
     }
@@ -179,7 +193,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
       await streamOpenRouterResponse(apiKey, model, systemPrompt, overlayWindow)
     } catch (error) {
       console.error('AI generation error:', error)
-      overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_CHUNK, `Error: ${(error as Error).message}`)
+      overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_CHUNK, `**Error:** ${(error as Error).message}`)
     }
 
     overlayWindow.webContents.send(IPC_CHANNELS.AI_RESPONSE_END)
@@ -190,7 +204,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
     const result = await dialog.showOpenDialog(overlayWindow, {
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Documents', extensions: ['pdf', 'docx', 'txt', 'md'] },
+        { name: 'Documents', extensions: ['pdf', 'docx', 'txt', 'md', 'csv'] },
       ],
     })
 
@@ -244,9 +258,40 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
     return loaded.map(d => ({ id: d.id, name: d.name, uploadedAt: d.uploadedAt, chunkCount: d.chunks.length }))
   })
 
+  // Remove individual document
+  ipcMain.handle('document:remove', (_event, docId: string) => {
+    contextDocuments = contextDocuments.filter(d => d.id !== docId)
+    return true
+  })
+
   // Clear context
   ipcMain.handle(IPC_CHANNELS.CLEAR_CONTEXT, () => {
     contextDocuments = []
+    return true
+  })
+
+  // Export transcript
+  ipcMain.handle('transcript:export', async (_event, { lines, aiAnswer }: { lines: TranscriptLine[], aiAnswer: string | null }) => {
+    const result = await dialog.showSaveDialog(overlayWindow, {
+      defaultPath: `transcript-${new Date().toISOString().slice(0, 10)}.txt`,
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+    })
+
+    if (result.canceled || !result.filePath) return false
+
+    const formatted = lines.map(line => {
+      const time = new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      const prefix = line.isQuestion ? '[Q] ' : ''
+      return `[${time}] ${prefix}${line.text}`
+    }).join('\n')
+
+    let output = `Interview AI — Transcript\nDate: ${new Date().toLocaleDateString()}\n${'='.repeat(50)}\n\n${formatted}`
+
+    if (aiAnswer) {
+      output += `\n\n${'='.repeat(50)}\nAI Response:\n${'='.repeat(50)}\n\n${aiAnswer}`
+    }
+
+    fs.writeFileSync(result.filePath, output, 'utf-8')
     return true
   })
 
@@ -261,7 +306,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
       sessionMode: 'interview',
       language: 'en',
       autoDetectQuestions: true,
-      questionSilenceThreshold: 1500,
+      questionSilenceThreshold: 3000,
     })
   })
 

@@ -14,7 +14,9 @@
   "dependencies": {
     "electron-store": "^8.1.0",
     "mammoth": "^1.7.1",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

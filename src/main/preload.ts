@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-// Inline IPC channel names (can't import from shared in sandboxed preload)
 const IPC_CHANNELS = {
   TRANSCRIPT_UPDATE: 'transcript:update',
   AI_RESPONSE_START: 'ai:response:start',
@@ -28,6 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Documents
   loadDocument: () =>
     ipcRenderer.invoke(IPC_CHANNELS.LOAD_DOCUMENT),
+  removeDocument: (id: string) =>
+    ipcRenderer.invoke('document:remove', id),
   clearContext: () =>
     ipcRenderer.invoke(IPC_CHANNELS.CLEAR_CONTEXT),
 
@@ -44,6 +45,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('whisper:start'),
   stopWhisper: () =>
     ipcRenderer.invoke('whisper:stop'),
+
+  // Export
+  exportTranscript: (lines: any[], aiAnswer: string | null) =>
+    ipcRenderer.invoke('transcript:export', { lines, aiAnswer }),
 
   // Overlay
   toggleOverlay: () =>
