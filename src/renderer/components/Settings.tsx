@@ -65,7 +65,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
           onChange={e => update('preferredModel', e.target.value as AppSettings['preferredModel'])}
           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50"
         >
-          <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6 (recommended)</option>
+          <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (recommended)</option>
           <option value="anthropic/claude-sonnet-4-5">Claude Sonnet 4.5</option>
           <option value="anthropic/claude-opus-4-6">Claude Opus 4.6 (highest quality)</option>
           <option value="google/gemini-2.5-flash">Gemini 2.5 Flash (fastest)</option>

@@ -6,6 +6,8 @@ export interface TranscriptLine {
   id: string
   text: string
   timestamp: number
+  lastUpdated?: number
+  isQuestion?: boolean
   speaker?: 'user' | 'other' | 'unknown'
 }
 
@@ -34,7 +36,7 @@ export interface DocumentChunk {
 
 export interface AppSettings {
   openRouterApiKey: string
-  preferredModel: 'anthropic/claude-sonnet-4-6' | 'anthropic/claude-sonnet-4-5' | 'anthropic/claude-opus-4-6' | 'google/gemini-2.5-flash'
+  preferredModel: 'anthropic/claude-sonnet-4.6' | 'anthropic/claude-sonnet-4-5' | 'anthropic/claude-opus-4-6' | 'google/gemini-2.5-flash'
   whisperModel: 'tiny' | 'base' | 'small' | 'medium'
   overlayPosition: OverlayPosition
   overlayOpacity: number       // 0.6 - 1.0

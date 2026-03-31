@@ -6,7 +6,7 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import { IPC_CHANNELS, AppSettings, ContextDocument, DocumentChunk, TranscriptLine } from '../shared/types'
 import { SYSTEM_PROMPT_INTERVIEW, SYSTEM_PROMPT_MEETING, SYSTEM_PROMPT_SALES } from '../shared/prompts'
-import { transcribeAudioChunk, checkWhisperInstalled } from './audio'
+import { transcribeAudioChunk, checkWhisperInstalled, startWhisperServer, stopWhisperServer } from './audio'
 
 const store = new Store()
 let contextDocuments: ContextDocument[] = []
@@ -127,7 +127,18 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
     return await checkWhisperInstalled()
   })
 
-  // Audio transcription (local Whisper)
+  // Start whisper server (called when user clicks Start)
+  ipcMain.handle('whisper:start', async () => {
+    return await startWhisperServer()
+  })
+
+  // Stop whisper server
+  ipcMain.handle('whisper:stop', async () => {
+    stopWhisperServer()
+    return true
+  })
+
+  // Audio transcription (local Whisper via persistent server)
   ipcMain.handle(IPC_CHANNELS.AUDIO_CHUNK, async (_event, audioData: ArrayBuffer) => {
     const buffer = Buffer.from(audioData)
     const result = await transcribeAudioChunk(buffer)
@@ -141,7 +152,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.TRIGGER_AI, async (_event, { transcript, question }: { transcript: TranscriptLine[], question: string }) => {
     const settings = store.get('settings', {}) as Partial<AppSettings>
     const apiKey = settings.openRouterApiKey || ''
-    const model = settings.preferredModel || 'anthropic/claude-sonnet-4-6'
+    const model = settings.preferredModel || 'anthropic/claude-sonnet-4.6'
     const mode = settings.sessionMode || 'interview'
 
     if (!apiKey) {
@@ -243,7 +254,7 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => {
     return store.get('settings', {
       openRouterApiKey: '',
-      preferredModel: 'anthropic/claude-sonnet-4-6',
+      preferredModel: 'anthropic/claude-sonnet-4.6',
       whisperModel: 'base',
       overlayPosition: { x: 0, y: 0, width: 420, height: 600 },
       overlayOpacity: 0.85,

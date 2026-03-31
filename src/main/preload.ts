@@ -37,9 +37,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings: any) =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVE_SETTINGS, settings),
 
-  // Whisper check
+  // Whisper
   checkWhisper: () =>
     ipcRenderer.invoke('whisper:check'),
+  startWhisper: () =>
+    ipcRenderer.invoke('whisper:start'),
+  stopWhisper: () =>
+    ipcRenderer.invoke('whisper:stop'),
 
   // Overlay
   toggleOverlay: () =>
