@@ -17,10 +17,12 @@ declare global {
       stopWhisper: () => Promise<void>
       exportTranscript: (lines: TranscriptLine[], aiAnswer: string | null) => Promise<boolean>
       toggleOverlay: () => Promise<void>
+      toggleStealth: () => Promise<boolean>
       onTranscriptUpdate: (cb: (line: TranscriptLine) => void) => () => void
       onAIResponseStart: (cb: () => void) => () => void
       onAIResponseChunk: (cb: (chunk: string) => void) => () => void
       onAIResponseEnd: (cb: () => void) => () => void
+      onStealthToggle: (cb: (stealth: boolean) => void) => () => void
     }
   }
 }
@@ -32,6 +34,8 @@ export interface AudioDevice {
 
 const DEFAULT_SETTINGS: AppSettings = {
   openRouterApiKey: '',
+  openaiApiKey: '',
+  sttProvider: 'local',
   preferredModel: 'anthropic/claude-sonnet-4.6',
   whisperModel: 'base',
   overlayPosition: { x: 0, y: 0, width: 420, height: 600 },
@@ -88,7 +92,10 @@ export default function App() {
   const [micLevel, setMicLevel] = useState(0)
   const [whisperLoading, setWhisperLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [stealthMode, setStealthMode] = useState(false)
 
+  // Guard against double-click race on toggleListening
+  const isTogglingRef = useRef(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -105,6 +112,14 @@ export default function App() {
   // Load settings on mount
   useEffect(() => {
     window.electronAPI.getSettings().then(setSettings)
+  }, [])
+
+  // Stealth mode listener
+  useEffect(() => {
+    const unsub = window.electronAPI.onStealthToggle((stealth) => {
+      setStealthMode(prev => !prev)
+    })
+    return unsub
   }, [])
 
   // Enumerate audio devices
@@ -124,6 +139,8 @@ export default function App() {
         }
       } catch (err) {
         console.error('Failed to enumerate audio devices:', err)
+        // Don't crash — just show empty device list
+        setAudioDevices([])
       }
     }
     loadDevices()
@@ -249,32 +266,46 @@ export default function App() {
     recorder.start()
   }, [])
 
-  // Start/stop audio capture
+  // Start/stop audio capture — guarded against double-click race condition
   const toggleListening = useCallback(async () => {
-    if (isListening) {
-      // Stop interval FIRST so no new chunks are enqueued after we kill the server
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current)
-        recordingIntervalRef.current = null
-      }
-      mediaRecorderRef.current?.stop()
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      mediaRecorderRef.current = null
-      streamRef.current = null
-      setIsListening(false)
-      stopMicMonitoring()
-      // stopWhisper is called AFTER everything is shut down so the isAcceptingRequests
-      // gate drops any chunk that was already in-flight before we killed the recorder
-      window.electronAPI.stopWhisper()
-      return
-    }
+    if (isTogglingRef.current) return
+    isTogglingRef.current = true
 
     try {
+      if (isListening) {
+        // Stop interval FIRST so no new chunks are enqueued after we kill the server
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current)
+          recordingIntervalRef.current = null
+        }
+        mediaRecorderRef.current?.stop()
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        mediaRecorderRef.current = null
+        streamRef.current = null
+        setIsListening(false)
+        stopMicMonitoring()
+        // Stop whisper after everything is shut down (only stops local server if in local mode)
+        await window.electronAPI.stopWhisper()
+        return
+      }
+
+      const isCloudMode = settingsRef.current.sttProvider === 'cloud-whisper'
+
       setWhisperLoading(true)
+      if (isCloudMode) {
+        // Cloud mode: no local server needed, but validate API key
+        if (!settingsRef.current.openaiApiKey) {
+          console.error('No OpenAI API key configured')
+          setWhisperLoading(false)
+          return
+        }
+      }
+
       const whisperStarted = await window.electronAPI.startWhisper()
       setWhisperLoading(false)
-      if (!whisperStarted) {
+      if (!whisperStarted && !isCloudMode) {
         console.error('Failed to start whisper server')
+        return
       }
 
       const constraints: MediaStreamConstraints = {
@@ -303,6 +334,8 @@ export default function App() {
     } catch (err) {
       setWhisperLoading(false)
       console.error('Audio capture failed:', err)
+    } finally {
+      isTogglingRef.current = false
     }
   }, [isListening, selectedDeviceId, startNewRecording, startMicMonitoring, stopMicMonitoring])
 
@@ -361,6 +394,11 @@ export default function App() {
     setSettings(newSettings)
   }, [])
 
+  // Toggle stealth mode
+  const toggleStealth = useCallback(() => {
+    setStealthMode(prev => !prev)
+  }, [])
+
   return (
     <Overlay
       transcript={transcript}
@@ -376,6 +414,7 @@ export default function App() {
       isUploading={isUploading}
       audioDevices={audioDevices}
       selectedDeviceId={selectedDeviceId}
+      stealthMode={stealthMode}
       onDeviceChange={setSelectedDeviceId}
       onSelectLine={setSelectedLineId}
       onToggleSettings={() => setShowSettings(s => !s)}
@@ -387,6 +426,7 @@ export default function App() {
       onRemoveDocument={removeDocument}
       onClearContext={clearContext}
       onSaveSettings={handleSaveSettings}
+      onToggleStealth={toggleStealth}
     />
   )
 }

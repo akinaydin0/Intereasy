@@ -299,6 +299,8 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => {
     return store.get('settings', {
       openRouterApiKey: '',
+      openaiApiKey: '',
+      sttProvider: 'local',
       preferredModel: 'anthropic/claude-sonnet-4.6',
       whisperModel: 'base',
       overlayPosition: { x: 0, y: 0, width: 420, height: 600 },
@@ -322,5 +324,13 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
     } else {
       overlayWindow.show()
     }
+  })
+
+  // Stealth mode — toggle overlay opacity (near-invisible but still functional)
+  let stealthMode = false
+  ipcMain.handle(IPC_CHANNELS.STEALTH_MODE, () => {
+    stealthMode = !stealthMode
+    overlayWindow.webContents.send(IPC_CHANNELS.STEALTH_MODE, stealthMode)
+    return stealthMode
   })
 }

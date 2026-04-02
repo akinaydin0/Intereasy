@@ -3,8 +3,9 @@ import { existsSync } from 'fs'
 import path from 'path'
 import os from 'os'
 import http from 'http'
+import https from 'https'
 import Store from 'electron-store'
-import { TranscriptLine } from '../shared/types'
+import { TranscriptLine, SttProvider } from '../shared/types'
 
 const store = new Store()
 
@@ -43,7 +44,17 @@ function getServerScript(): string {
   return devPath
 }
 
+export function getSttProvider(): SttProvider {
+  return (store.get('settings.sttProvider', 'local') as SttProvider)
+}
+
 export async function startWhisperServer(): Promise<boolean> {
+  // Cloud mode doesn't need a local server
+  if (getSttProvider() === 'cloud-whisper') {
+    isAcceptingRequests = true
+    return true
+  }
+
   // Check if server is already running
   if (serverReady) return true
   if (await isServerRunning()) {
@@ -112,6 +123,10 @@ export function stopWhisperServer(): void {
   // Set gate FIRST so any in-flight transcription requests bail out immediately
   isAcceptingRequests = false
   serverReady = false
+
+  // Cloud mode has no local process to kill
+  if (getSttProvider() === 'cloud-whisper') return
+
   if (whisperProcess) {
     const proc = whisperProcess
     whisperProcess = null
@@ -175,12 +190,127 @@ function postAudio(audioBuffer: Buffer, language: string): Promise<string> {
   })
 }
 
+/**
+ * Cloud transcription via OpenAI Whisper API.
+ * Sends raw audio as multipart/form-data and returns the transcribed text.
+ */
+function transcribeViaCloudAPI(audioBuffer: Buffer, language: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const apiKey = store.get('settings.openaiApiKey', '') as string
+    if (!apiKey) {
+      reject(new Error('No OpenAI API key configured. Add your key in Settings.'))
+      return
+    }
+
+    // Build multipart/form-data manually (no external deps needed)
+    const boundary = `----FormBoundary${Date.now().toString(36)}`
+    const CRLF = '\r\n'
+
+    const parts: Buffer[] = []
+
+    // File part
+    parts.push(Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="file"; filename="audio.webm"${CRLF}` +
+      `Content-Type: audio/webm${CRLF}${CRLF}`
+    ))
+    parts.push(audioBuffer)
+    parts.push(Buffer.from(CRLF))
+
+    // Model part
+    parts.push(Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="model"${CRLF}${CRLF}` +
+      `whisper-1${CRLF}`
+    ))
+
+    // Language part (skip if auto-detect)
+    if (language && language !== 'auto') {
+      parts.push(Buffer.from(
+        `--${boundary}${CRLF}` +
+        `Content-Disposition: form-data; name="language"${CRLF}${CRLF}` +
+        `${language}${CRLF}`
+      ))
+    }
+
+    // Response format
+    parts.push(Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="response_format"${CRLF}${CRLF}` +
+      `json${CRLF}`
+    ))
+
+    // Closing boundary
+    parts.push(Buffer.from(`--${boundary}--${CRLF}`))
+
+    const body = Buffer.concat(parts)
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/audio/transcriptions',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+      timeout: 30000,
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk: Buffer) => { data += chunk.toString() })
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data)
+          if (res.statusCode !== 200) {
+            reject(new Error(parsed.error?.message || `OpenAI API error: ${res.statusCode}`))
+          } else {
+            resolve(parsed.text || '')
+          }
+        } catch {
+          reject(new Error(`Invalid OpenAI response: ${data.slice(0, 200)}`))
+        }
+      })
+    })
+
+    req.on('error', (err) => reject(err))
+    req.on('timeout', () => { req.destroy(); reject(new Error('Cloud transcription timed out')) })
+    req.write(body)
+    req.end()
+  })
+}
+
 export async function transcribeAudioChunk(audioBuffer: Buffer): Promise<TranscriptLine | null> {
   // If the user stopped listening, reject in-flight chunks — do NOT restart the server
   if (!isAcceptingRequests) {
     console.log('[audio] Not accepting requests (listening stopped), dropping chunk')
     return null
   }
+
+  const provider = getSttProvider()
+  const language = (store.get('settings.language', 'en') as string)
+
+  if (provider === 'cloud-whisper') {
+    // Cloud mode — send directly to OpenAI API
+    try {
+      const text = await transcribeViaCloudAPI(audioBuffer, language)
+      if (!text) return null
+
+      return {
+        id: `t-${Date.now()}`,
+        text,
+        timestamp: Date.now(),
+        speaker: 'unknown',
+      }
+    } catch (error) {
+      console.error('[audio] Cloud transcription error:', error)
+      return null
+    }
+  }
+
+  // Local mode — use local Whisper server
   if (!serverReady) {
     console.log('[audio] Whisper server not ready, starting...')
     const started = await startWhisperServer()
@@ -189,8 +319,6 @@ export async function transcribeAudioChunk(audioBuffer: Buffer): Promise<Transcr
       return null
     }
   }
-
-  const language = (store.get('settings.language', 'en') as string)
 
   try {
     const text = await postAudio(audioBuffer, language)

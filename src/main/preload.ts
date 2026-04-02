@@ -13,6 +13,7 @@ const IPC_CHANNELS = {
   SAVE_SETTINGS: 'settings:save',
   GET_SETTINGS: 'settings:get',
   TOGGLE_OVERLAY: 'overlay:toggle',
+  STEALTH_MODE: 'overlay:stealth',
 } as const
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -53,6 +54,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Overlay
   toggleOverlay: () =>
     ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_OVERLAY),
+
+  // Stealth mode
+  toggleStealth: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.STEALTH_MODE),
+  onStealthToggle: (callback: (stealth: boolean) => void) => {
+    const handler = (_event: any, stealth: boolean) => callback(stealth)
+    ipcRenderer.on(IPC_CHANNELS.STEALTH_MODE, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.STEALTH_MODE, handler)
+  },
 
   // Listeners (Main → Renderer)
   onTranscriptUpdate: (callback: (line: any) => void) => {

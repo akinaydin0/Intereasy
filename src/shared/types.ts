@@ -34,8 +34,12 @@ export interface DocumentChunk {
   documentId: string
 }
 
+export type SttProvider = 'local' | 'cloud-whisper'
+
 export interface AppSettings {
   openRouterApiKey: string
+  openaiApiKey: string
+  sttProvider: SttProvider
   preferredModel: 'anthropic/claude-sonnet-4.6' | 'anthropic/claude-sonnet-4-5' | 'anthropic/claude-opus-4-6' | 'google/gemini-2.5-flash'
   whisperModel: 'tiny' | 'base' | 'small' | 'medium'
   overlayPosition: OverlayPosition
@@ -78,4 +82,5 @@ export const IPC_CHANNELS = {
   SAVE_SETTINGS: 'settings:save',
   GET_SETTINGS: 'settings:get',
   TOGGLE_OVERLAY: 'overlay:toggle',
+  STEALTH_MODE: 'overlay:stealth',
 } as const

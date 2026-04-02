@@ -20,6 +20,7 @@ interface OverlayProps {
   isUploading: boolean
   audioDevices: AudioDevice[]
   selectedDeviceId: string
+  stealthMode: boolean
   onDeviceChange: (deviceId: string) => void
   onSelectLine: (id: string) => void
   onToggleSettings: () => void
@@ -31,6 +32,7 @@ interface OverlayProps {
   onRemoveDocument: (id: string) => void
   onClearContext: () => void
   onSaveSettings: (settings: AppSettings) => void
+  onToggleStealth: () => void
 }
 
 export default function Overlay({
@@ -47,6 +49,7 @@ export default function Overlay({
   isUploading,
   audioDevices,
   selectedDeviceId,
+  stealthMode,
   onDeviceChange,
   onSelectLine,
   onToggleSettings,
@@ -58,6 +61,7 @@ export default function Overlay({
   onRemoveDocument,
   onClearContext,
   onSaveSettings,
+  onToggleStealth,
 }: OverlayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -65,31 +69,73 @@ export default function Overlay({
     ? transcript.find(t => t.id === selectedLineId)?.text || null
     : null
 
+  const isCloud = settings.sttProvider === 'cloud-whisper'
+
+  // Stealth mode — nearly invisible, shows on hover
+  if (stealthMode) {
+    return (
+      <div className="stealth-mode fixed top-4 right-4 select-none">
+        <div
+          className="flex items-center gap-2 glass-pill rounded-full px-4 py-2 border border-gray-700/30 shadow-2xl cursor-pointer"
+          onClick={onToggleStealth}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
+          <span className="text-gray-400 text-xs">Stealth</span>
+        </div>
+      </div>
+    )
+  }
+
   // Pill (collapsed) view
   if (!isExpanded) {
     return (
-      <div className="fixed top-4 right-4 select-none">
+      <div className="fixed top-4 right-4 select-none overlay-transition">
         <div
-          className="flex items-center gap-2 bg-gray-900/90 backdrop-blur-md rounded-full px-4 py-2 border border-gray-700/50 shadow-2xl cursor-pointer hover:bg-gray-800/90 transition-colors"
+          className="flex items-center gap-2.5 glass-pill rounded-full px-4 py-2.5 border border-gray-700/30 shadow-2xl cursor-pointer hover:border-gray-600/50 transition-all duration-200 group"
           onClick={() => setIsExpanded(true)}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* Status dot */}
           <div className="relative">
-            <div className={`w-2.5 h-2.5 rounded-full ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full transition-colors ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
             {isListening && (
               <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-green-400 animate-ping" />
             )}
           </div>
+
           <MicLevel level={micLevel} isListening={isListening} />
+
+          {/* Status text */}
           <span className="text-gray-300 text-xs font-medium">
             {whisperLoading ? 'Loading...' : isListening ? 'Listening' : 'Paused'}
           </span>
+
+          {/* Provider badge */}
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+            isCloud ? 'bg-violet-500/20 text-violet-400' : 'bg-emerald-500/20 text-emerald-400'
+          }`}>
+            {isCloud ? 'Cloud' : 'Local'}
+          </span>
+
           {documents.length > 0 && (
             <span className="text-gray-500 text-xs">| {documents.length} doc{documents.length > 1 ? 's' : ''}</span>
           )}
           {isGenerating && (
             <span className="text-blue-400 text-xs animate-pulse">Thinking...</span>
           )}
+
+          {/* Stealth button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleStealth() }}
+            className="ml-1 p-1 rounded-full text-gray-600 hover:text-gray-300 hover:bg-gray-700/50 transition-all opacity-0 group-hover:opacity-100"
+            title="Stealth mode (Ctrl+Shift+H)"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          </button>
         </div>
       </div>
     )
@@ -98,36 +144,42 @@ export default function Overlay({
   // Expanded split-panel view
   return (
     <div
-      className="fixed inset-0 flex flex-col bg-gray-900/95 backdrop-blur-md overflow-hidden"
+      className={`fixed inset-0 flex flex-col glass overflow-hidden overlay-transition`}
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 py-2 border-b border-gray-700/50 shrink-0"
+        className="flex items-center justify-between px-4 py-2.5 border-b border-gray-700/30 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div className="relative">
-            <div className={`w-2.5 h-2.5 rounded-full ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full transition-colors ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
             {isListening && (
               <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-green-400 animate-ping" />
             )}
           </div>
           <MicLevel level={micLevel} isListening={isListening} />
-          <span className="text-gray-200 text-sm font-semibold">
-            {whisperLoading ? 'Loading model...' : 'Interview AI'}
+          <span className="text-gray-200 text-sm font-semibold tracking-tight">
+            {whisperLoading ? 'Loading model...' : 'Intereasy'}
+          </span>
+          {/* Provider badge in header */}
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+            isCloud ? 'bg-violet-500/15 text-violet-400 border border-violet-500/20' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+          }`}>
+            {isCloud ? '☁️ Cloud' : '🖥️ Local'}
           </span>
         </div>
-        <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button
             onClick={onToggleListening}
             disabled={whisperLoading}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
               whisperLoading
-                ? 'bg-yellow-500/20 text-yellow-400 animate-pulse'
+                ? 'bg-amber-500/15 text-amber-400 animate-pulse border border-amber-500/20'
                 : isListening
-                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                  : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                  ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
+                  : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20'
             }`}
           >
             {whisperLoading ? 'Loading...' : isListening ? 'Stop' : 'Start'}
@@ -135,7 +187,7 @@ export default function Overlay({
           <button
             onClick={onTriggerAI}
             disabled={isGenerating || transcript.length === 0}
-            className="px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
           >
             Ask AI
           </button>
@@ -143,7 +195,7 @@ export default function Overlay({
           <button
             onClick={onExportTranscript}
             disabled={transcript.length === 0}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/40 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
             title="Export transcript"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -152,10 +204,21 @@ export default function Overlay({
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
+          {/* Stealth mode */}
+          <button
+            onClick={onToggleStealth}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/40 transition-all"
+            title="Stealth mode (Ctrl+Shift+H)"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          </button>
           {/* Settings gear */}
           <button
             onClick={onToggleSettings}
-            className={`p-1.5 rounded-lg transition-colors ${showSettings ? 'text-blue-400 bg-blue-500/20' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'}`}
+            className={`p-1.5 rounded-lg transition-all ${showSettings ? 'text-blue-400 bg-blue-500/15' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/40'}`}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />
@@ -165,7 +228,7 @@ export default function Overlay({
           {/* Collapse */}
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-1 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/40 transition-all"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M4 10L10 4M4 4L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -176,13 +239,13 @@ export default function Overlay({
 
       {/* Audio Device Selector */}
       {audioDevices.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-gray-700/50 shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <div className="flex items-center gap-1.5">
+        <div className="px-4 py-2 border-b border-gray-700/20 shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <div className="flex items-center gap-2">
             <select
               value={selectedDeviceId}
               onChange={e => onDeviceChange(e.target.value)}
               disabled={isListening}
-              className="flex-1 bg-gray-800/50 border border-gray-700/50 rounded px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+              className="flex-1 bg-gray-800/40 border border-gray-700/30 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-300 focus:outline-none focus:border-blue-500/40 disabled:opacity-40 transition-all"
             >
               {audioDevices.map(d => (
                 <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
@@ -191,17 +254,17 @@ export default function Overlay({
             {/* System audio hint */}
             <div className="relative group">
               <button
-                className="w-5 h-5 rounded-full bg-gray-700/60 text-gray-400 text-[10px] font-bold hover:bg-gray-600/60 hover:text-gray-200 transition-colors flex items-center justify-center shrink-0"
+                className="w-5 h-5 rounded-full bg-gray-700/40 text-gray-500 text-[10px] font-bold hover:bg-gray-600/50 hover:text-gray-300 transition-all flex items-center justify-center shrink-0"
                 title="How to capture speaker/meeting audio"
               >
                 ?
               </button>
-              <div className="absolute right-0 top-6 w-64 p-2.5 bg-gray-800 border border-gray-600/50 rounded-lg shadow-xl text-[10px] text-gray-300 leading-relaxed z-50 hidden group-hover:block">
-                <p className="font-semibold text-gray-100 mb-1">🔊 Capturing Speaker Audio</p>
-                <p className="mb-1.5">To hear what others say in a meeting, you need a <span className="text-blue-400">virtual audio cable</span>:</p>
-                <p>• <span className="font-medium text-white">Windows:</span> Install <span className="text-blue-400">VB-Cable</span> (free) — vb-audio.com</p>
-                <p>• <span className="font-medium text-white">macOS:</span> Install <span className="text-blue-400">BlackHole</span> (free) — existential.audio</p>
-                <p className="mt-1.5 text-gray-500">After installing, the virtual device appears here. Select it to capture all speaker output.</p>
+              <div className="absolute right-0 top-7 w-64 p-3 bg-gray-800/95 backdrop-blur-xl border border-gray-600/30 rounded-xl shadow-2xl text-[10px] text-gray-300 leading-relaxed z-50 hidden group-hover:block">
+                <p className="font-semibold text-gray-100 mb-1.5">🔊 Capturing Speaker Audio</p>
+                <p className="mb-2">To hear what others say in a meeting, you need a <span className="text-violet-400">virtual audio cable</span>:</p>
+                <p>• <span className="font-medium text-white">Windows:</span> Install <span className="text-violet-400">VB-Cable</span> (free) — vb-audio.com</p>
+                <p>• <span className="font-medium text-white">macOS:</span> Install <span className="text-violet-400">BlackHole</span> (free) — existential.audio</p>
+                <p className="mt-2 text-gray-500">After installing, the virtual device appears here. Select it to capture all speaker output.</p>
               </div>
             </div>
           </div>
@@ -210,29 +273,29 @@ export default function Overlay({
 
       {/* Settings / Context drawer */}
       {showSettings && (
-        <div className="border-b border-gray-700/50 max-h-[300px] overflow-y-auto shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <div className="px-3 pt-2">
-            <div className="flex gap-2 mb-2">
+        <div className="border-b border-gray-700/20 max-h-[300px] overflow-y-auto shrink-0 settings-enter" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <div className="px-4 pt-3">
+            <div className="flex gap-2 mb-3">
               <button
                 onClick={onLoadDocument}
                 disabled={isUploading}
-                className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 transition-colors"
+                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 disabled:opacity-40 transition-all"
               >
                 {isUploading ? 'Uploading...' : '+ Upload Doc'}
               </button>
               {documents.length > 0 && (
                 <button
                   onClick={onClearContext}
-                  className="px-2 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/15 transition-all"
                 >
                   Clear All
                 </button>
               )}
             </div>
             {documents.length > 0 && (
-              <div className="mb-2 space-y-1">
+              <div className="mb-3 space-y-1.5">
                 {documents.map(d => (
-                  <div key={d.id} className="flex items-center gap-2 text-[11px] text-gray-400 bg-gray-800/30 rounded px-2 py-1 group">
+                  <div key={d.id} className="flex items-center gap-2 text-[11px] text-gray-400 bg-gray-800/30 rounded-lg px-3 py-1.5 group border border-gray-700/10">
                     <span className="text-purple-400">&#128196;</span>
                     <span className="truncate flex-1">{d.name}</span>
                     <span className="text-gray-600">{d.chunkCount} chunks</span>
@@ -259,7 +322,7 @@ export default function Overlay({
 
         {/* Transcript Panel */}
         <div className="flex-1 min-h-[100px] flex flex-col overflow-hidden">
-          <div className="px-3 py-1.5 flex items-center justify-between border-b border-gray-700/30 shrink-0">
+          <div className="px-4 py-2 flex items-center justify-between border-b border-gray-700/20 shrink-0">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Transcript</span>
             <span className="text-[10px] text-gray-600">{transcript.length} line{transcript.length !== 1 ? 's' : ''}</span>
           </div>
@@ -272,12 +335,12 @@ export default function Overlay({
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="h-px bg-gray-600/50 shrink-0" />
+        {/* Gradient Divider */}
+        <div className="gradient-divider shrink-0" />
 
         {/* AI Response Panel */}
         <div className="flex-1 min-h-[100px] flex flex-col overflow-hidden">
-          <div className="px-3 py-1.5 flex items-center justify-between border-b border-gray-700/30 shrink-0">
+          <div className="px-4 py-2 flex items-center justify-between border-b border-gray-700/20 shrink-0">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">AI Response</span>
             {isGenerating && (
               <div className="flex items-center gap-1.5">

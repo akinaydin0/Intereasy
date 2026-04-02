@@ -18,7 +18,7 @@
 
 ## 🌟 Overview
 
-**Intereasy** is a stealthy, highly responsive desktop application that assists you during live interviews, meetings, and calls. It lives as a discreet overlay on your screen, captures audio from your microphone **or your system speaker output** (meeting participants), transcribes it locally using [OpenAI Whisper](https://github.com/openai/whisper), and provides real-time AI-powered responses — all privately on your machine.
+**Intereasy** is a stealthy, highly responsive desktop application that assists you during live interviews, meetings, and calls. It lives as a discreet overlay on your screen, captures audio from your microphone **or your system speaker output** (meeting participants), transcribes it using [OpenAI Whisper](https://github.com/openai/whisper) — either **locally** or via the **OpenAI Cloud API** — and provides real-time AI-powered responses.
 
 Never lose your train of thought again. Be fully present while having the power of AI right beside you, completely invisible to others.
 
@@ -29,11 +29,13 @@ Never lose your train of thought again. Be fully present while having the power 
 | Feature | Description |
 |---|---|
 | 👻 **Invisible Overlay** | Transparent, click-through overlay — hidden from screen share |
+| 🕵️ **Stealth Mode** | One-click toggle makes the UI nearly invisible — shows on hover |
 | 🎤 **Microphone Capture** | Records your mic in real-time |
 | 🔊 **System/Speaker Capture** | Hear meeting participants via a virtual audio cable (see setup below) |
 | 🤫 **Silence Filtering** | Automatically drops hallucinated "Thank you" responses from silent audio |
 | 📄 **Document Context** | Upload PDFs, Word docs, or Markdown to give the AI relevant context |
 | ⚡ **Local Transcription** | Whisper runs fully offline — no audio leaves your machine |
+| ☁️ **Cloud Transcription** | Optional OpenAI Whisper API — fast, no Python required |
 | 🤖 **Multi-model AI** | Powered by OpenRouter — choose Claude, Gemini, and more |
 | 💬 **Markdown Responses** | AI answers beautifully formatted and easy to read at a glance |
 | 🌍 **Cross-Platform** | Works on Windows and macOS |
@@ -45,7 +47,7 @@ Never lose your train of thought again. Be fully present while having the power 
 - **Framework**: [Electron](https://www.electronjs.org/) — desktop runtime
 - **Frontend**: [React 18](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/)
-- **Transcription**: [OpenAI Whisper](https://github.com/openai/whisper) (local Python server)
+- **Transcription**: [OpenAI Whisper](https://github.com/openai/whisper) (local Python server **or** cloud API)
 - **AI**: [OpenRouter](https://openrouter.ai/) — Claude, Gemini, etc.
 - **Document Parsing**: `pdf-parse`, `mammoth`
 
@@ -82,10 +84,13 @@ Never lose your train of thought again. Be fully present while having the power 
   - **Windows**: `winget install ffmpeg --accept-package-agreements --accept-source-agreements`
   - **macOS**: `brew install ffmpeg`
 
-- **OpenAI Whisper**:
+- **OpenAI Whisper** (only if using **Local** mode):
   ```bash
   pip install -U openai-whisper
   ```
+
+> [!TIP]
+> **Don't want to install Python?** Use the **OpenAI Cloud API** mode in Settings — just add your OpenAI API key and skip all Python/FFmpeg setup.
 
 ---
 
@@ -150,15 +155,24 @@ By default, the app can only access microphone inputs. To also **capture what ot
 
 | Setting | Description |
 |---|---|
-| **OpenRouter API Key** | Get one free at [openrouter.ai](https://openrouter.ai/) |
+| **STT Provider** | `Local Whisper` (free, offline) or `OpenAI Cloud API` (fast, ~$0.006/min) |
+| **OpenAI API Key** | For cloud transcription — get one at [platform.openai.com](https://platform.openai.com/) |
+| **OpenRouter API Key** | For AI responses — get one at [openrouter.ai](https://openrouter.ai/) |
 | **AI Model** | Claude Sonnet (recommended), Gemini Flash (fastest), Claude Opus (highest quality) |
-| **Whisper Model** | `tiny` (fastest) → `base` → `small` → `medium` (best accuracy) |
+| **Whisper Model** | `tiny` (fastest) → `base` → `small` → `medium` (best accuracy) — local mode only |
 | **Session Mode** | Interview / Meeting / Sales Call / Custom — changes the AI's system prompt |
 | **Language** | English, Turkish, or Auto-detect |
 | **Overlay Opacity** | Adjust transparency of the overlay window |
 
 > [!NOTE]
-> Larger Whisper models (`small`, `medium`) take more time to transcribe each audio chunk on CPU. If you see delays, switch to `base`.
+> Larger Whisper models (`small`, `medium`) take more time to transcribe each audio chunk on CPU. If you see delays, switch to `base` or use the Cloud API.
+
+### ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Shift+Space` | Show/hide overlay |
+| `Ctrl+Shift+H` | Toggle stealth mode |
 
 ---
 

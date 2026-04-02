@@ -29,7 +29,7 @@ export function createOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     
     // Window type affects screen capture exclusion
-    type: 'panel',       // macOS: 'panel' is excluded from screen capture
+    type: process.platform === 'darwin' ? 'panel' : 'toolbar',
     
     webPreferences: {
       nodeIntegration: false,

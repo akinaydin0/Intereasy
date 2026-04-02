@@ -28,6 +28,12 @@ app.whenReady().then(async () => {
     toggleOverlayVisibility()
   })
 
+  // Global shortcut: Cmd/Ctrl+Shift+H → stealth mode
+  globalShortcut.register('CommandOrControl+Shift+H', () => {
+    const { ipcMain } = require('electron')
+    overlayWindow.webContents.send('overlay:stealth', undefined)
+  })
+
   // Create tray icon
   try {
     // Create a simple 16x16 icon programmatically (mic symbol)
