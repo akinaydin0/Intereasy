@@ -159,13 +159,6 @@ When user uploads documents:
 - Hotkey to ask specific question manually
 - Language support (Turkish, etc.)
 
-## Environment Variables
-
-```
-ANTHROPIC_API_KEY=your_key_here
-OPENAI_API_KEY=your_key_here (for Whisper)
-```
-
 ## Running the App
 
 ```bash
