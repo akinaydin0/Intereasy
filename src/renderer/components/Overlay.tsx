@@ -177,16 +177,34 @@ export default function Overlay({
       {/* Audio Device Selector */}
       {audioDevices.length > 0 && (
         <div className="px-3 py-1.5 border-b border-gray-700/50 shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <select
-            value={selectedDeviceId}
-            onChange={e => onDeviceChange(e.target.value)}
-            disabled={isListening}
-            className="w-full bg-gray-800/50 border border-gray-700/50 rounded px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
-          >
-            {audioDevices.map(d => (
-              <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={selectedDeviceId}
+              onChange={e => onDeviceChange(e.target.value)}
+              disabled={isListening}
+              className="flex-1 bg-gray-800/50 border border-gray-700/50 rounded px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+            >
+              {audioDevices.map(d => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+              ))}
+            </select>
+            {/* System audio hint */}
+            <div className="relative group">
+              <button
+                className="w-5 h-5 rounded-full bg-gray-700/60 text-gray-400 text-[10px] font-bold hover:bg-gray-600/60 hover:text-gray-200 transition-colors flex items-center justify-center shrink-0"
+                title="How to capture speaker/meeting audio"
+              >
+                ?
+              </button>
+              <div className="absolute right-0 top-6 w-64 p-2.5 bg-gray-800 border border-gray-600/50 rounded-lg shadow-xl text-[10px] text-gray-300 leading-relaxed z-50 hidden group-hover:block">
+                <p className="font-semibold text-gray-100 mb-1">🔊 Capturing Speaker Audio</p>
+                <p className="mb-1.5">To hear what others say in a meeting, you need a <span className="text-blue-400">virtual audio cable</span>:</p>
+                <p>• <span className="font-medium text-white">Windows:</span> Install <span className="text-blue-400">VB-Cable</span> (free) — vb-audio.com</p>
+                <p>• <span className="font-medium text-white">macOS:</span> Install <span className="text-blue-400">BlackHole</span> (free) — existential.audio</p>
+                <p className="mt-1.5 text-gray-500">After installing, the virtual device appears here. Select it to capture all speaker output.</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

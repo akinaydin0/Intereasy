@@ -252,6 +252,7 @@ export default function App() {
   // Start/stop audio capture
   const toggleListening = useCallback(async () => {
     if (isListening) {
+      // Stop interval FIRST so no new chunks are enqueued after we kill the server
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current)
         recordingIntervalRef.current = null
@@ -262,6 +263,8 @@ export default function App() {
       streamRef.current = null
       setIsListening(false)
       stopMicMonitoring()
+      // stopWhisper is called AFTER everything is shut down so the isAcceptingRequests
+      // gate drops any chunk that was already in-flight before we killed the recorder
       window.electronAPI.stopWhisper()
       return
     }

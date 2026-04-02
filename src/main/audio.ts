@@ -17,18 +17,20 @@ const FALLBACK_PYTHONS = [
   path.join(os.homedir(), '.local/pipx/venvs/openai-whisper/bin/python'),
   '/opt/homebrew/bin/python3',
   '/usr/local/bin/python3',
-  'python3',
+  process.platform === 'win32' ? 'python' : 'python3',
 ]
 
 let whisperProcess: ChildProcess | null = null
 let serverReady = false
+// Gate that prevents in-flight audio chunks from restarting the server after Stop
+let isAcceptingRequests = false
 
 function findPython(): string {
-  if (existsSync(PIPX_PYTHON)) return PIPX_PYTHON
+  if (existsSync(PIPX_PYTHON)) return PIPX_PYTHON;
   for (const p of FALLBACK_PYTHONS) {
-    if (p === 'python3' || existsSync(p)) return p
+    if (p === 'python3' || p === 'python' || existsSync(p)) return p;
   }
-  return 'python3'
+  return process.platform === 'win32' ? 'python' : 'python3';
 }
 
 function getServerScript(): string {
@@ -75,6 +77,7 @@ export async function startWhisperServer(): Promise<boolean> {
       console.log(msg)
       if (msg.includes('Listening on')) {
         serverReady = true
+        isAcceptingRequests = true
         clearTimeout(startTimeout)
         resolve(true)
       }
@@ -106,10 +109,19 @@ export async function startWhisperServer(): Promise<boolean> {
 }
 
 export function stopWhisperServer(): void {
+  // Set gate FIRST so any in-flight transcription requests bail out immediately
+  isAcceptingRequests = false
+  serverReady = false
   if (whisperProcess) {
-    whisperProcess.kill()
+    const proc = whisperProcess
     whisperProcess = null
-    serverReady = false
+    if (process.platform === 'win32') {
+      // On Windows, taskkill is needed to reliably free the port
+      const { spawn: spawnSync } = require('child_process')
+      spawnSync('taskkill', ['/pid', String(proc.pid), '/f', '/t'], { detached: true, stdio: 'ignore' })
+    } else {
+      proc.kill('SIGTERM')
+    }
     console.log('[audio] Whisper server stopped')
   }
 }
@@ -136,7 +148,7 @@ function postAudio(audioBuffer: Buffer, language: string): Promise<string> {
         'Content-Length': audioBuffer.length,
         'X-Language': language,
       },
-      timeout: 30000,
+      timeout: 300000,
     }
 
     const req = http.request(options, (res) => {
@@ -164,6 +176,11 @@ function postAudio(audioBuffer: Buffer, language: string): Promise<string> {
 }
 
 export async function transcribeAudioChunk(audioBuffer: Buffer): Promise<TranscriptLine | null> {
+  // If the user stopped listening, reject in-flight chunks — do NOT restart the server
+  if (!isAcceptingRequests) {
+    console.log('[audio] Not accepting requests (listening stopped), dropping chunk')
+    return null
+  }
   if (!serverReady) {
     console.log('[audio] Whisper server not ready, starting...')
     const started = await startWhisperServer()
@@ -192,11 +209,14 @@ export async function transcribeAudioChunk(audioBuffer: Buffer): Promise<Transcr
 }
 
 export async function checkWhisperInstalled(): Promise<boolean> {
-  // Check if the pipx venv python exists
   const pythonBin = findPython()
-  if (pythonBin === 'python3') {
-    // Not a known path, try to verify
-    return existsSync(path.join(os.homedir(), '.local/bin/whisper'))
+  try {
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+    await execFileAsync(pythonBin, ['-c', 'import whisper'])
+    return true
+  } catch (error) {
+    return false
   }
-  return existsSync(pythonBin)
 }

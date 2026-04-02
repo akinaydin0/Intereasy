@@ -1,14 +1,16 @@
 <div align="center">
 
-# 🎙️ Interview AI (Invisible Assistant)
+# 🎙️ Intereasy — Invisible AI Meeting Assistant
 
-**An invisible real-time AI assistant for interviews and meetings.**
+**A real-time, invisible AI assistant for interviews, meetings, and online calls.**
 
 [![Electron](https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=electron&logoColor=white)](#)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](#)
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)](#)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](#)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
+[![Whisper](https://img.shields.io/badge/OpenAI_Whisper-412991?style=for-the-badge&logo=openai&logoColor=white)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](#)
 
 </div>
 
@@ -16,77 +18,155 @@
 
 ## 🌟 Overview
 
-**Interview AI** is a stealthy, highly responsive desktop application built to assist you during live interviews, meetings, and calls. Living as a discreet overlay on your screen, it captures system audio, processes meeting context (like resumes, job descriptions, or notes), and provides real-time intelligent responses using AI. 
+**Intereasy** is a stealthy, highly responsive desktop application that assists you during live interviews, meetings, and calls. It lives as a discreet overlay on your screen, captures audio from your microphone **or your system speaker output** (meeting participants), transcribes it locally using [OpenAI Whisper](https://github.com/openai/whisper), and provides real-time AI-powered responses — all privately on your machine.
 
-Never lose your train of thought or miss an important question again. Be fully present in your meetings while having the power of AI right beside you, completely invisible to others.
+Never lose your train of thought again. Be fully present while having the power of AI right beside you, completely invisible to others.
+
+---
 
 ## ✨ Features
 
-- **👻 Invisible Overlay**: Runs silently as a transparent, click-through overlay on your screen.
-- **🎤 Real-Time Audio Capture**: Captures and processes system and microphone audio seamlessly.
-- **📄 Document Processing**: Upload and parse context documents like PDFs, Word files, and Markdown to give the AI context about the meeting.
-- **⚡ Blazing Fast**: Built with React, Vite, and Electron for a snappy, lightweight experience.
-- **💬 Markdown Rendering**: Responses are beautifully formatted in Markdown for quick reading at a glance.
+| Feature | Description |
+|---|---|
+| 👻 **Invisible Overlay** | Transparent, click-through overlay — hidden from screen share |
+| 🎤 **Microphone Capture** | Records your mic in real-time |
+| 🔊 **System/Speaker Capture** | Hear meeting participants via a virtual audio cable (see setup below) |
+| 🤫 **Silence Filtering** | Automatically drops hallucinated "Thank you" responses from silent audio |
+| 📄 **Document Context** | Upload PDFs, Word docs, or Markdown to give the AI relevant context |
+| ⚡ **Local Transcription** | Whisper runs fully offline — no audio leaves your machine |
+| 🤖 **Multi-model AI** | Powered by OpenRouter — choose Claude, Gemini, and more |
+| 💬 **Markdown Responses** | AI answers beautifully formatted and easy to read at a glance |
+| 🌍 **Cross-Platform** | Works on Windows and macOS |
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [Electron](https://www.electronjs.org/) (Desktop runtime)
-- **Frontend**: [React 18](https://reactjs.org/)
+- **Framework**: [Electron](https://www.electronjs.org/) — desktop runtime
+- **Frontend**: [React 18](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Document Parsing**: `pdf-parse`, `mammoth` (for `.docx`), `react-markdown`
+- **Transcription**: [OpenAI Whisper](https://github.com/openai/whisper) (local Python server)
+- **AI**: [OpenRouter](https://openrouter.ai/) — Claude, Gemini, etc.
+- **Document Parsing**: `pdf-parse`, `mammoth`
+
+---
 
 ## 📂 Project Structure
 
 ```text
 ├── src/
-│   ├── main/             # Electron Main Process (System interactions, IPC, Audio, Overlay)
-│   ├── renderer/         # React Frontend (UI, State Management, App views)
-│   └── shared/           # Types and utilities shared between main and renderer
+│   ├── main/             # Electron Main Process (IPC, Audio, Overlay)
+│   ├── renderer/         # React Frontend (UI, State)
+│   └── shared/           # Types shared between main and renderer
+├── scripts/
+│   └── whisper_server.py # Local Whisper HTTP server (keeps model in memory)
 ├── assets/               # Static assets & icons
-├── docs/                 # Documentation
-├── package.json          # Dependencies & Scripts
-├── tsconfig.json         # TypeScript configuration
-└── vite.config.ts        # Vite configuration
+├── package.json
+├── tsconfig.main.json
+└── vite.config.ts
 ```
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) (v18+ recommended) and `npm` installed.
+
+- **Node.js** v18+ — [nodejs.org](https://nodejs.org/)
+- **Python 3.8–3.14** — [python.org](https://www.python.org/downloads/)
+
+  > [!WARNING]
+  > **Windows**: During Python installation, check **"Add Python to PATH"**. After installing Python AND FFmpeg, you **must fully restart your terminal and IDE** (e.g. VS Code) before running the app. Otherwise environment variables won't be updated and you'll see "FFmpeg not found" errors.
+
+- **FFmpeg**:
+  - **Windows**: `winget install ffmpeg --accept-package-agreements --accept-source-agreements`
+  - **macOS**: `brew install ffmpeg`
+
+- **OpenAI Whisper**:
+  ```bash
+  pip install -U openai-whisper
+  ```
+
+---
 
 ### Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/interview-ai.git
-   cd "interview ai"
-   ```
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/intereasy.git
+cd intereasy
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+# 2. Install Node dependencies
+npm install
+```
+
+---
 
 ### Development
 
-Run the app in development mode with Hot Module Replacement (HMR):
 ```bash
 npm run dev
 ```
 
+This starts the Vite dev server and Electron simultaneously with Hot Module Replacement.
+
+---
+
 ### Building for Production
 
-To package the application into a standalone executable for your operating system:
 ```bash
 npm run dist
 ```
-This will output the packaged binaries into the `dist` folder.
+
+Outputs packaged binaries for your OS into the `dist/` folder.
+
+---
+
+## 🔊 Capturing System/Speaker Audio (for Meetings)
+
+By default, the app can only access microphone inputs. To also **capture what other participants say** in Zoom, Teams, Google Meet, etc., you need a **virtual audio cable**. Once installed, the virtual device automatically shows up in the audio source dropdown inside the app.
+
+### Windows — VB-Cable (Free)
+
+1. Download and install **VB-Cable** from [vb-audio.com](https://vb-audio.com/Cable/)
+2. Open **Sound Settings** → set your **Playback** device to `CABLE Input (VB-Audio Virtual Cable)`
+3. In Intereasy, select **CABLE Output (VB-Audio Virtual Cable)** as your audio source
+4. Your meeting audio will now be heard by Whisper
+
+> [!TIP]
+> To hear the meeting *and* capture it, open Sound settings → "CABLE Input" → Properties → Listen tab → check "Listen to this device" and set playback to your speakers/headphones.
+
+### macOS — BlackHole (Free)
+
+1. Download and install **BlackHole 2ch** from [existential.audio](https://existential.audio/blackhole/)
+2. Open **Audio MIDI Setup** (in Utilities) → click `+` → **Create Multi-Output Device**
+3. Check both your **Built-in Output** (speakers/headphones) and **BlackHole 2ch**
+4. Set this Multi-Output Device as your system output in System Settings → Sound
+5. In Intereasy, select **BlackHole 2ch** as your audio source
+
+---
+
+## ⚙️ Settings Reference
+
+| Setting | Description |
+|---|---|
+| **OpenRouter API Key** | Get one free at [openrouter.ai](https://openrouter.ai/) |
+| **AI Model** | Claude Sonnet (recommended), Gemini Flash (fastest), Claude Opus (highest quality) |
+| **Whisper Model** | `tiny` (fastest) → `base` → `small` → `medium` (best accuracy) |
+| **Session Mode** | Interview / Meeting / Sales Call / Custom — changes the AI's system prompt |
+| **Language** | English, Turkish, or Auto-detect |
+| **Overlay Opacity** | Adjust transparency of the overlay window |
+
+> [!NOTE]
+> Larger Whisper models (`small`, `medium`) take more time to transcribe each audio chunk on CPU. If you see delays, switch to `base`.
+
+---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](#) if you want to contribute.
+Contributions, issues, and feature requests are welcome! Feel free to open an issue or a pull request.
+
+---
 
 ## 📝 License
 

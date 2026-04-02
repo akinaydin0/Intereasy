@@ -10,7 +10,14 @@ import os
 import json
 import tempfile
 import time
+import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+if not shutil.which("ffmpeg"):
+    print("[whisper-server] ERROR: FFmpeg is not installed or not found in system PATH. Whisper requires FFmpeg to transcribe audio.", flush=True)
+    print("[whisper-server] Please install FFmpeg (e.g. 'scoop install ffmpeg' on Windows or 'brew install ffmpeg' on Mac) and restart.", flush=True)
+    sys.exit(1)
+
 
 # Load whisper once at startup
 print("[whisper-server] Loading whisper model...", flush=True)
@@ -41,12 +48,21 @@ class TranscribeHandler(BaseHTTPRequestHandler):
             try:
                 start = time.time()
                 lang = self.headers.get("X-Language", LANGUAGE)
-                opts = {"fp16": False}
+                opts = {
+                    "fp16": False,
+                    "condition_on_previous_text": False
+                }
                 if lang and lang != "auto":
                     opts["language"] = lang
 
                 result = model.transcribe(tmp.name, **opts)
-                text = result["text"].strip()
+                
+                valid_texts = []
+                for segment in result.get("segments", []):
+                    if segment.get("no_speech_prob", 0.0) < 0.6:
+                        valid_texts.append(segment.get("text", ""))
+                        
+                text = " ".join(valid_texts).strip()
                 elapsed = time.time() - start
 
                 if text:
@@ -59,12 +75,17 @@ class TranscribeHandler(BaseHTTPRequestHandler):
                     "text": text,
                     "duration": elapsed
                 }).encode())
+            except ConnectionError:
+                print("[whisper-server] Client disconnected before receiving response.", flush=True)
             except Exception as e:
                 print(f"[whisper-server] Error: {e}", flush=True)
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                try:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": str(e)}).encode())
+                except Exception:
+                    pass
             finally:
                 os.unlink(tmp.name)
 
