@@ -20,7 +20,7 @@ interface OverlayProps {
   isUploading: boolean
   audioDevices: AudioDevice[]
   selectedDeviceId: string
-  stealthMode: boolean
+  screenShareVisible: boolean
   onDeviceChange: (deviceId: string) => void
   onSelectLine: (id: string) => void
   onToggleSettings: () => void
@@ -32,7 +32,7 @@ interface OverlayProps {
   onRemoveDocument: (id: string) => void
   onClearContext: () => void
   onSaveSettings: (settings: AppSettings) => void
-  onToggleStealth: () => void
+  onToggleScreenShare: () => void
 }
 
 export default function Overlay({
@@ -49,7 +49,7 @@ export default function Overlay({
   isUploading,
   audioDevices,
   selectedDeviceId,
-  stealthMode,
+  screenShareVisible,
   onDeviceChange,
   onSelectLine,
   onToggleSettings,
@@ -61,7 +61,7 @@ export default function Overlay({
   onRemoveDocument,
   onClearContext,
   onSaveSettings,
-  onToggleStealth,
+  onToggleScreenShare,
 }: OverlayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -70,22 +70,6 @@ export default function Overlay({
     : null
 
   const isCloud = settings.sttProvider === 'cloud-whisper'
-
-  // Stealth mode — nearly invisible, shows on hover
-  if (stealthMode) {
-    return (
-      <div className="stealth-mode fixed top-4 right-4 select-none">
-        <div
-          className="flex items-center gap-2 glass-pill rounded-full px-4 py-2 border border-gray-700/30 shadow-2xl cursor-pointer"
-          onClick={onToggleStealth}
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-400' : 'bg-gray-500'}`} />
-          <span className="text-gray-400 text-xs">Stealth</span>
-        </div>
-      </div>
-    )
-  }
 
   // Pill (collapsed) view
   if (!isExpanded) {
@@ -125,17 +109,12 @@ export default function Overlay({
             <span className="text-blue-400 text-xs animate-pulse">Thinking...</span>
           )}
 
-          {/* Stealth button */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleStealth() }}
-            className="ml-1 p-1 rounded-full text-gray-600 hover:text-gray-300 hover:bg-gray-700/50 transition-all opacity-0 group-hover:opacity-100"
-            title="Stealth mode (Ctrl+Shift+H)"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          </button>
+          {/* Screen share visibility indicator */}
+          {screenShareVisible && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400">
+              Visible
+            </span>
+          )}
         </div>
       </div>
     )
@@ -144,7 +123,7 @@ export default function Overlay({
   // Expanded split-panel view
   return (
     <div
-      className={`fixed inset-0 flex flex-col glass overflow-hidden overlay-transition`}
+      className="fixed inset-0 flex flex-col glass overflow-hidden overlay-transition"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Header */}
@@ -204,16 +183,29 @@ export default function Overlay({
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
-          {/* Stealth mode */}
+          {/* Screen share visibility toggle */}
           <button
-            onClick={onToggleStealth}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/40 transition-all"
-            title="Stealth mode (Ctrl+Shift+H)"
+            onClick={onToggleScreenShare}
+            className={`p-1.5 rounded-lg transition-all ${
+              screenShareVisible
+                ? 'text-amber-400 bg-amber-500/15'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/40'
+            }`}
+            title={screenShareVisible ? 'Visible to screen share — click to hide' : 'Hidden from screen share — click to show'}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
+            {screenShareVisible ? (
+              /* Eye open = visible to share */
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            ) : (
+              /* Eye with slash = hidden from share */
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            )}
           </button>
           {/* Settings gear */}
           <button
@@ -236,6 +228,20 @@ export default function Overlay({
           </button>
         </div>
       </div>
+
+      {/* Screen share warning banner */}
+      {screenShareVisible && (
+        <div className="px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 shrink-0 flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 shrink-0">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span className="text-amber-400 text-[10px] font-medium">Visible to screen share</span>
+          <button onClick={onToggleScreenShare} className="ml-auto text-[10px] text-amber-400/70 hover:text-amber-300 transition-colors">
+            Hide
+          </button>
+        </div>
+      )}
 
       {/* Audio Device Selector */}
       {audioDevices.length > 0 && (

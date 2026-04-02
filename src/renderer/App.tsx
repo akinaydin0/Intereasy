@@ -17,12 +17,12 @@ declare global {
       stopWhisper: () => Promise<void>
       exportTranscript: (lines: TranscriptLine[], aiAnswer: string | null) => Promise<boolean>
       toggleOverlay: () => Promise<void>
-      toggleStealth: () => Promise<boolean>
+      toggleScreenShare: () => Promise<boolean>
       onTranscriptUpdate: (cb: (line: TranscriptLine) => void) => () => void
       onAIResponseStart: (cb: () => void) => () => void
       onAIResponseChunk: (cb: (chunk: string) => void) => () => void
       onAIResponseEnd: (cb: () => void) => () => void
-      onStealthToggle: (cb: (stealth: boolean) => void) => () => void
+      onScreenShareToggle: (cb: (isProtected: boolean) => void) => () => void
     }
   }
 }
@@ -49,6 +49,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 const MERGE_GAP_MS = 4000
 const TRANSCRIPT_BUFFER_SIZE = 50
 const AUTO_TRIGGER_COOLDOWN_MS = 15000
+
+// Recording interval per provider (cloud needs longer chunks to avoid flooding)
+const CHUNK_INTERVAL_LOCAL = 2000  // 2s for local whisper
+const CHUNK_INTERVAL_CLOUD = 5000 // 5s for cloud API — prevents request pileup
 
 // Question detection — tighter than before, requires 5+ words
 const QUESTION_STARTERS = [
@@ -92,7 +96,8 @@ export default function App() {
   const [micLevel, setMicLevel] = useState(0)
   const [whisperLoading, setWhisperLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [stealthMode, setStealthMode] = useState(false)
+  // Screen share visibility: true = protected (invisible to share), false = visible
+  const [screenShareVisible, setScreenShareVisible] = useState(false)
 
   // Guard against double-click race on toggleListening
   const isTogglingRef = useRef(false)
@@ -114,10 +119,11 @@ export default function App() {
     window.electronAPI.getSettings().then(setSettings)
   }, [])
 
-  // Stealth mode listener
+  // Screen share visibility listener
   useEffect(() => {
-    const unsub = window.electronAPI.onStealthToggle((stealth) => {
-      setStealthMode(prev => !prev)
+    const unsub = window.electronAPI.onScreenShareToggle((isProtected) => {
+      // isProtected=true means invisible to share, so "share visible" is the inverse
+      setScreenShareVisible(!isProtected)
     })
     return unsub
   }, [])
@@ -139,7 +145,6 @@ export default function App() {
         }
       } catch (err) {
         console.error('Failed to enumerate audio devices:', err)
-        // Don't crash — just show empty device list
         setAudioDevices([])
       }
     }
@@ -284,7 +289,6 @@ export default function App() {
         streamRef.current = null
         setIsListening(false)
         stopMicMonitoring()
-        // Stop whisper after everything is shut down (only stops local server if in local mode)
         await window.electronAPI.stopWhisper()
         return
       }
@@ -293,7 +297,6 @@ export default function App() {
 
       setWhisperLoading(true)
       if (isCloudMode) {
-        // Cloud mode: no local server needed, but validate API key
         if (!settingsRef.current.openaiApiKey) {
           console.error('No OpenAI API key configured')
           setWhisperLoading(false)
@@ -316,11 +319,13 @@ export default function App() {
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
 
-      // Start mic level monitoring
       startMicMonitoring(stream)
 
       startNewRecording(stream)
       setIsListening(true)
+
+      // Use longer chunk intervals for cloud to avoid flooding the API
+      const chunkInterval = isCloudMode ? CHUNK_INTERVAL_CLOUD : CHUNK_INTERVAL_LOCAL
 
       recordingIntervalRef.current = setInterval(() => {
         const currentRecorder = mediaRecorderRef.current
@@ -330,7 +335,7 @@ export default function App() {
         if (streamRef.current && streamRef.current.active) {
           startNewRecording(streamRef.current)
         }
-      }, 2000)
+      }, chunkInterval)
     } catch (err) {
       setWhisperLoading(false)
       console.error('Audio capture failed:', err)
@@ -394,9 +399,10 @@ export default function App() {
     setSettings(newSettings)
   }, [])
 
-  // Toggle stealth mode
-  const toggleStealth = useCallback(() => {
-    setStealthMode(prev => !prev)
+  // Toggle screen share visibility
+  const toggleScreenShare = useCallback(async () => {
+    const isProtected = await window.electronAPI.toggleScreenShare()
+    setScreenShareVisible(!isProtected)
   }, [])
 
   return (
@@ -414,7 +420,7 @@ export default function App() {
       isUploading={isUploading}
       audioDevices={audioDevices}
       selectedDeviceId={selectedDeviceId}
-      stealthMode={stealthMode}
+      screenShareVisible={screenShareVisible}
       onDeviceChange={setSelectedDeviceId}
       onSelectLine={setSelectedLineId}
       onToggleSettings={() => setShowSettings(s => !s)}
@@ -426,7 +432,7 @@ export default function App() {
       onRemoveDocument={removeDocument}
       onClearContext={clearContext}
       onSaveSettings={handleSaveSettings}
-      onToggleStealth={toggleStealth}
+      onToggleScreenShare={toggleScreenShare}
     />
   )
 }

@@ -82,5 +82,5 @@ export const IPC_CHANNELS = {
   SAVE_SETTINGS: 'settings:save',
   GET_SETTINGS: 'settings:get',
   TOGGLE_OVERLAY: 'overlay:toggle',
-  STEALTH_MODE: 'overlay:stealth',
+  TOGGLE_SCREEN_SHARE: 'overlay:screen-share',
 } as const

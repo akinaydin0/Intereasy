@@ -28,10 +28,9 @@ app.whenReady().then(async () => {
     toggleOverlayVisibility()
   })
 
-  // Global shortcut: Cmd/Ctrl+Shift+H → stealth mode
+  // Global shortcut: Cmd/Ctrl+Shift+H → toggle screen share visibility
   globalShortcut.register('CommandOrControl+Shift+H', () => {
-    const { ipcMain } = require('electron')
-    overlayWindow.webContents.send('overlay:stealth', undefined)
+    overlayWindow.webContents.send('overlay:screen-share')
   })
 
   // Create tray icon

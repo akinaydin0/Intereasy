@@ -13,7 +13,7 @@ const IPC_CHANNELS = {
   SAVE_SETTINGS: 'settings:save',
   GET_SETTINGS: 'settings:get',
   TOGGLE_OVERLAY: 'overlay:toggle',
-  STEALTH_MODE: 'overlay:stealth',
+  TOGGLE_SCREEN_SHARE: 'overlay:screen-share',
 } as const
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -55,13 +55,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleOverlay: () =>
     ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_OVERLAY),
 
-  // Stealth mode
-  toggleStealth: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.STEALTH_MODE),
-  onStealthToggle: (callback: (stealth: boolean) => void) => {
-    const handler = (_event: any, stealth: boolean) => callback(stealth)
-    ipcRenderer.on(IPC_CHANNELS.STEALTH_MODE, handler)
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.STEALTH_MODE, handler)
+  // Screen share visibility
+  toggleScreenShare: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_SCREEN_SHARE),
+  onScreenShareToggle: (callback: (isProtected: boolean) => void) => {
+    const handler = (_event: any, isProtected: boolean) => callback(isProtected)
+    ipcRenderer.on(IPC_CHANNELS.TOGGLE_SCREEN_SHARE, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.TOGGLE_SCREEN_SHARE, handler)
   },
 
   // Listeners (Main → Renderer)

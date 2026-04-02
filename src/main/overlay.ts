@@ -7,6 +7,7 @@ import { BrowserWindow, screen } from 'electron'
 import path from 'path'
 
 let overlayWindow: BrowserWindow | null = null
+let contentProtected = true // Default: hidden from screen capture
 
 export function createOverlayWindow(): BrowserWindow {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -92,6 +93,24 @@ export function toggleOverlayVisibility(): void {
     overlayWindow.show()
     overlayWindow.focus()
   }
+}
+
+/**
+ * Toggle content protection (screen capture visibility).
+ * When ON (default): overlay is HIDDEN from screen capture/share — invisible to participants
+ * When OFF: overlay is VISIBLE in screen capture — participants CAN see it
+ * Returns the new state: true = protected (invisible), false = visible
+ */
+export function toggleContentProtection(): boolean {
+  if (!overlayWindow) return contentProtected
+  contentProtected = !contentProtected
+  overlayWindow.setContentProtection(contentProtected)
+  console.log(`[overlay] Content protection: ${contentProtected ? 'ON (invisible to screen share)' : 'OFF (visible to screen share)'}`)
+  return contentProtected
+}
+
+export function isContentProtected(): boolean {
+  return contentProtected
 }
 
 export function setOverlayPosition(x: number, y: number): void {

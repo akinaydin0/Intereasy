@@ -26,6 +26,11 @@ let serverReady = false
 // Gate that prevents in-flight audio chunks from restarting the server after Stop
 let isAcceptingRequests = false
 
+// ── Cloud request serialization ──
+// Prevents concurrent cloud API calls which cause out-of-order / duplicate transcripts.
+// Each chunk waits for the previous one to finish before sending.
+let cloudRequestQueue: Promise<void> = Promise.resolve()
+
 function findPython(): string {
   if (existsSync(PIPX_PYTHON)) return PIPX_PYTHON;
   for (const p of FALLBACK_PYTHONS) {
@@ -123,6 +128,8 @@ export function stopWhisperServer(): void {
   // Set gate FIRST so any in-flight transcription requests bail out immediately
   isAcceptingRequests = false
   serverReady = false
+  // Reset cloud queue so old promises don't block after restart
+  cloudRequestQueue = Promise.resolve()
 
   // Cloud mode has no local process to kill
   if (getSttProvider() === 'cloud-whisper') return
@@ -293,21 +300,34 @@ export async function transcribeAudioChunk(audioBuffer: Buffer): Promise<Transcr
   const language = (store.get('settings.language', 'en') as string)
 
   if (provider === 'cloud-whisper') {
-    // Cloud mode — send directly to OpenAI API
-    try {
-      const text = await transcribeViaCloudAPI(audioBuffer, language)
-      if (!text) return null
+    // Cloud mode — serialize requests through a queue so they don't overlap.
+    // Each chunk waits for the previous one to finish before being sent.
+    let result: TranscriptLine | null = null
 
-      return {
-        id: `t-${Date.now()}`,
-        text,
-        timestamp: Date.now(),
-        speaker: 'unknown',
+    const doWork = async () => {
+      // Re-check gate after waiting in queue — user may have stopped
+      if (!isAcceptingRequests) return
+
+      try {
+        const text = await transcribeViaCloudAPI(audioBuffer, language)
+        if (!text || !text.trim()) return
+
+        result = {
+          id: `t-${Date.now()}`,
+          text: text.trim(),
+          timestamp: Date.now(),
+          speaker: 'unknown',
+        }
+      } catch (error) {
+        console.error('[audio] Cloud transcription error:', error)
       }
-    } catch (error) {
-      console.error('[audio] Cloud transcription error:', error)
-      return null
     }
+
+    // Chain onto the queue — this guarantees serial execution
+    cloudRequestQueue = cloudRequestQueue.then(doWork).catch(() => {})
+    await cloudRequestQueue
+
+    return result
   }
 
   // Local mode — use local Whisper server

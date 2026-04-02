@@ -29,7 +29,7 @@ Never lose your train of thought again. Be fully present while having the power 
 | Feature | Description |
 |---|---|
 | 👻 **Invisible Overlay** | Transparent, click-through overlay — hidden from screen share |
-| 🕵️ **Stealth Mode** | One-click toggle makes the UI nearly invisible — shows on hover |
+| 👁️ **Screen Share Toggle** | Toggle visibility to screen capture — show/hide with one click |
 | 🎤 **Microphone Capture** | Records your mic in real-time |
 | 🔊 **System/Speaker Capture** | Hear meeting participants via a virtual audio cable (see setup below) |
 | 🤫 **Silence Filtering** | Automatically drops hallucinated "Thank you" responses from silent audio |
@@ -172,7 +172,7 @@ By default, the app can only access microphone inputs. To also **capture what ot
 | Shortcut | Action |
 |---|---|
 | `Ctrl+Shift+Space` | Show/hide overlay |
-| `Ctrl+Shift+H` | Toggle stealth mode |
+| `Ctrl+Shift+H` | Toggle screen share visibility |
 
 ---
 

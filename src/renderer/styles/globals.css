@@ -55,16 +55,9 @@ html, body, #root {
   -webkit-backdrop-filter: blur(20px) saturate(200%);
 }
 
-/* Stealth mode */
-.stealth-mode {
-  opacity: 0.04 !important;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.stealth-mode:hover {
-  opacity: 0.85 !important;
-  pointer-events: auto;
+/* Screen share visibility banner */
+.screen-share-banner {
+  animation: slideDown 0.2s ease-out;
 }
 
 /* Smooth transitions */

@@ -7,6 +7,7 @@ import mammoth from 'mammoth'
 import { IPC_CHANNELS, AppSettings, ContextDocument, DocumentChunk, TranscriptLine } from '../shared/types'
 import { SYSTEM_PROMPT_INTERVIEW, SYSTEM_PROMPT_MEETING, SYSTEM_PROMPT_SALES, SYSTEM_PROMPT_CUSTOM } from '../shared/prompts'
 import { transcribeAudioChunk, checkWhisperInstalled, startWhisperServer, stopWhisperServer } from './audio'
+import { toggleContentProtection } from './overlay'
 
 const store = new Store()
 let contextDocuments: ContextDocument[] = []
@@ -326,11 +327,10 @@ export function registerIpcHandlers(overlayWindow: BrowserWindow): void {
     }
   })
 
-  // Stealth mode — toggle overlay opacity (near-invisible but still functional)
-  let stealthMode = false
-  ipcMain.handle(IPC_CHANNELS.STEALTH_MODE, () => {
-    stealthMode = !stealthMode
-    overlayWindow.webContents.send(IPC_CHANNELS.STEALTH_MODE, stealthMode)
-    return stealthMode
+  // Toggle screen share visibility — toggles setContentProtection
+  ipcMain.handle(IPC_CHANNELS.TOGGLE_SCREEN_SHARE, () => {
+    const isProtected = toggleContentProtection()
+    overlayWindow.webContents.send(IPC_CHANNELS.TOGGLE_SCREEN_SHARE, isProtected)
+    return isProtected
   })
 }
